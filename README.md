@@ -1,231 +1,226 @@
+<div align="center">
+
 # rho
 
-Every window has a back side. Press a hotkey and the window you're looking at
-flips over; you type on the back of it. Press it again and you're back where
-you were.
+**Every window has a back side.**
 
-Notes bind themselves to the window they were taken behind — the app, the
-window title, and the browser URL — so coming back to that tab tomorrow and
-hitting the hotkey brings back the same note. Individually they're scattered
-across everything you do. Together they're one searchable library.
+Press a hotkey and the window you're looking at turns over. Type on the back of
+it. Press it again and you're back where you were — same tab, same page, same
+half-finished sentence.
 
-Windows only. The whole thing leans on Win32 and DWM.
+[![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-151219?style=flat-square)](#install)
+[![License](https://img.shields.io/badge/license-MIT-c06a35?style=flat-square)](LICENSE)
+[![Built with Electron](https://img.shields.io/badge/built%20with-Electron-4b4070?style=flat-square)](https://electronjs.org)
+[![Website](https://img.shields.io/badge/rho.pranavbarthwal.in-f7f3ec?style=flat-square&labelColor=151219)](https://rho.pranavbarthwal.in)
 
-## Running it
+[Website](https://rho.pranavbarthwal.in) ·
+[Install](#install) ·
+[How it works](#how-it-works) ·
+[Architecture](docs/ARCHITECTURE.md)
+
+<img src="docs/overlay.png" alt="A note open on the back of a browser window" width="820">
+
+</div>
+
+---
+
+## Why
+
+The cost of writing something down isn't the writing. It's leaving the page,
+finding the app, picking the note, and coming back changed. By the time you're
+there, the thought has cooled and you've lost your place.
+
+rho removes the trip. The note is already attached to what you're looking at.
+Nothing opens, nothing moves — the window just has a back now.
+
+## Features
+
+- **One key, from anywhere.** A global hotkey turns the current window over,
+  wherever you are. The editor has focus before the animation starts, so you can
+  type immediately.
+- **Notes stick to where you were.** Each note binds to the window it was taken
+  behind — the app, the window title, and the browser URL. Come back to that tab
+  tomorrow, press the key, and your note is there.
+- **Markdown that behaves like Notion.** Type `## ` for a heading, `- ` for a
+  bullet, `[] ` for a to-do. `/` opens a command menu. It's a real rich-text
+  editor, but what lands on disk is plain markdown.
+- **Your notes are files.** One `.md` per note in a folder you choose. Greppable,
+  syncable, and readable by any other editor. No database, no account, no cloud.
+- **A picture of where you were.** Each note keeps a screenshot of the window as
+  it looked when you wrote it.
+- **One library for all of it.** Every note from every window, grouped by app and
+  searchable in one place.
+- **Private by default.** Everything stays on your machine. The overlay is even
+  excluded from screen recordings and shares.
+
+## Install
+
+### Download
+
+Grab the installer from the [website](https://rho.pranavbarthwal.in) or the
+[Releases](https://github.com/PranavBarthwal/rho/releases) page. Windows 10 and
+11.
+
+### Build from source
+
+Requires [Node.js](https://nodejs.org) 20 or newer. Nothing else — no Python, no
+Visual Studio build tools.
 
 ```bash
+git clone https://github.com/PranavBarthwal/rho.git
+cd rho
 npm install
 npm run dev
 ```
 
-The hotkey defaults to `Control+Alt+Space`. If another app already owns that
-combination, rho falls back to the next free one from a short list and records
-what it actually got — check the tray menu or Settings to see which. The app
-lives in the tray; closing the library window doesn't quit it.
+To produce an installer in `dist/`:
 
 ```bash
-npm test          # resolver and store tests
-npm run typecheck
-npm run dist      # NSIS installer into dist/
+npm run dist
 ```
 
-## Looks
+## Usage
 
-The app uses the same design language as the landing page: warm paper
-(`#f7f3ec`) rather than the cool greys most note apps reach for, near-black ink
-with a violet cast, and a single burnt ember accent (`#c06a35`) spent on one
-thing per screen. Instrument Serif carries display text and headings; Inter
-carries everything functional. The tokens live in
-`src/renderer/shared/tokens.css` and both windows import them; change a value
-there and it moves everywhere.
+Press the hotkey behind any window and start typing. Press it again — or hit
+<kbd>Esc</kbd> — to put the window back. Notes save themselves as you type.
 
-Fonts are bundled from npm rather than fetched from a CDN, so a desktop app
-that may be offline still renders as designed.
+| Shortcut | Does |
+|---|---|
+| <kbd>Ctrl</kbd> <kbd>Alt</kbd> <kbd>Space</kbd> | Turn the window over, and back |
+| <kbd>Esc</kbd> | Put the window back |
+| <kbd>Ctrl</kbd> <kbd>Enter</kbd> | Same, for different muscle memory |
+| <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>L</kbd> | Open the library |
 
-## Where notes live
+> [!NOTE]
+> If another app already owns <kbd>Ctrl</kbd> <kbd>Alt</kbd> <kbd>Space</kbd>,
+> rho quietly takes the next free combination instead. The tray menu and
+> Settings both show which one it actually got, and you can change it.
 
-`%USERPROFILE%\rho\` by default:
+rho lives in the tray. Closing the library window doesn't quit it.
+
+### Writing
+
+Formatting happens as you type — the prefix disappears and the formatting takes
+its place.
+
+| Type | Get |
+|---|---|
+| `# ` `## ` `### ` | Headings |
+| `- ` | Bullet list |
+| `1. ` | Numbered list |
+| `[] ` | To-do with a checkbox |
+| `> ` | Quote |
+| ` ``` ` | Code block |
+| `---` | Divider |
+| `**bold**` `*italic*` `` `code` `` | Inline formatting |
+
+Type `/` at the start of a line for a menu of the same things, for when you
+can't remember which prefix.
+
+### The library
+
+<img src="docs/library.png" alt="The rho library, with notes grouped by app" width="820">
+
+Open it from the tray, or with <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>L</kbd>.
+Notes are grouped by the app they were written behind, and search covers
+titles, addresses and note text at once. There are no folders and no tags —
+you find a note by remembering where you were.
+
+## Your notes
+
+Everything lives in `%USERPROFILE%\rho\` by default:
 
 ```
-notes/2026/09/<id>.md   one markdown file per note, YAML frontmatter
-shots/<id>.jpg          the window as it looked when you wrote the note
-index.json              a cache, rebuilt from the files on startup
+rho/
+├─ notes/2026/09/<id>.md   one markdown file per note
+├─ shots/<id>.jpg          the window as it looked at the time
+└─ index.json              a cache, rebuilt from the files on startup
 ```
 
-The files are the source of truth. The index is reconciled against them every
-launch, so editing a note by hand, or having one arrive via OneDrive or git,
-works rather than corrupting anything.
+The files are the source of truth. Edit them by hand, sync the folder with
+OneDrive or Dropbox, put it in git — rho reconciles with whatever it finds on
+startup. Point it at a different folder in Settings.
 
-## How it fits together
-
-```
-hotkey ─► snapshot the foreground window   (synchronous — see below)
-       ─► look up the note, show the overlay, focus the editor   (~20ms)
-       ─► hold still, drawing nothing, until the window is photographed
-       ─► turn, over the recess                                  (~255ms)
-       ─► URL lookup lands, attaches to the note
-```
-
-The ordering is the design. The snapshot is synchronous because the foreground
-window is only knowable in the instant the hotkey fires — one `await` first and
-you're describing your own overlay. Everything slow happens after the editor
-already has focus, so you're typing before the animation finishes.
-
-### The editor
-
-The note surface is a real rich-text editor — TipTap over ProseMirror — but
-markdown is the storage format, not an export. What you type as `## ` becomes a
-heading as you type it, and what lands on disk is `## ` again. The file stays
-something you could open in any other editor, which is the entire reason notes
-are files.
-
-Typing the prefix is the primary way to format: `# `, `- `, `1. `, `> `,
-` ``` `, `---`, `[] `, and inline `**bold**`, `*italic*`, `` `code` ``. `/` opens
-a short command menu for the times you cannot remember which prefix — it is a
-fallback, not the main road, which is why it holds nine entries and not fifty.
-
-Both windows share one `Editor` component. It is never unmounted: switching
-notes swaps the document through an imperative handle, because remounting would
-cost the overlay its focus on the very frame it needs it.
-
-**Working on the UI:** `npx vite src/renderer` serves the real components in an
-ordinary browser at `/library/index.html` and `/overlay/index.html`. A dev-only
-mock (`src/renderer/shared/devMock.ts`) stands in for the preload bridge with
-sample notes, so the interface can be worked on without launching Electron or
-screenshotting the desktop. It installs itself only when the real bridge is
-absent and is stripped from production builds.
-
-### The flip
-
-The motion follows Apple's, which comes down to four things that are easy to
-get wrong:
-
-**The window must not be visible behind its own flip.** This is the one that
-decides whether the effect works at all. rho never touches the real window —
-it belongs to another process and keeps painting throughout — so the moment
-the card rotates far enough to stop covering its own rectangle, the untouched
-window shows through and the whole thing reads as a second panel flipping in
-front of the window. Two things prevent it:
-
-- A **recess** sits directly behind the card at exactly its size: a heavily
-  blurred, darkened echo of the screenshot, so the turn exposes what looks
-  like depth instead of a sharp duplicate. It is hidden at rest and switches
-  on without a fade, in the same frame the turn starts, while the card still
-  covers it.
-- The turn **does not begin until the screenshot exists**. Rotating early
-  means rotating an empty panel in front of the real window, which is the
-  fake-looking flip in its purest form. Focus is never gated on this — the
-  editor takes it on the first frame — so the wait costs nothing but a moment
-  where the window sits there looking untouched, which is the honest thing to
-  show when there is no picture of it yet.
-
-**Springs, not ease curves.** The rotation runs on a `linear()` easing solved
-from SwiftUI's `.spring(response: 0.42, dampingFraction: 0.78)`. It turns about
-2% past 180° and settles back. A cubic-bezier cannot overshoot, and that
-settle is most of what makes the motion feel like an object rather than a
-tween. Regenerate it by solving the damped-oscillator equation and emitting the
-stops; the constants are in the comment beside it.
-
-**Perspective proportional to the card.** A fixed focal length that flatters a
-small window tears a maximized one apart, so it is set from the card's longest
-edge (1.9×) at runtime. This is what makes the near edge swing toward you and
-the far edge recede.
-
-**Room to turn.** Under perspective the card's projection spills outside its own
-rectangle — measured at up to 93px vertically at 90° for a mid-sized window. So
-the overlay window is inflated by a margin (`FLIP_MARGIN`) and the card is
-placed inside it at an offset the main process computes. Without that the turn
-is sliced off against the window edge and the drop shadow has nowhere to fall.
-Clicking the margin dismisses, so it is a target rather than dead space.
-
-Depth and rotation are separate layers because they need different timing: the
-card recedes through the turn and comes back, which one interpolated transform
-cannot express.
-
-Closing runs the turn in reverse over 240ms before dismissing. That delay is
-the only place the animation is allowed to cost anything.
-
-**The latency budget**, measured on a 1920×1080 display:
+## Settings
 
 | | |
 |---|---|
-| hotkey → editor focused, typing lands | ~20ms |
-| → screenshot ready, turn begins | ~255ms |
-| → note fully facing you | ~690ms |
+| **Hotkey** | Any combination, e.g. `Control+Alt+Space` |
+| **Keep a picture of the window** | The screenshot stored with each note. It's also what the flip turns over |
+| **Read browser addresses** | Binds notes to a specific tab without the extension. See the caveats below |
+| **Start when I sign in** | Launch rho at login |
+| **Notes folder** | Where your `.md` files go |
 
-That middle number is `desktopCapturer.getSources`, and it is the whole cost —
-the JPEG encode is 9–29ms and the crop is under a millisecond. It does not
-respond to asking for fewer pixels: 271ms at full resolution, 268ms at 0.6×,
-275ms at 0.4×, so don't bother re-trying that. The only way below it is a
-permanently warm capture stream (~16–33ms per frame), which means rho capturing
-the screen continuously while it sits idle — a real CPU and privacy cost that
-isn't worth taking without asking first.
+## Browser extension (optional)
 
-**Working on it:** `src/renderer/overlay/harness.html` loads the real
-`overlay.css` against the real markup over a stand-in window, with a scrubber to
-hold any angle still. Run `npx vite src/renderer --port 5199` and open
-`/overlay/harness.html`. It is not bundled — only the entry points named in
-`electron.vite.config.ts` are. For inspecting the real overlay instead, launch
-with `RHO_NO_PROTECT=1`, which lifts the content protection that otherwise makes
-it invisible to every screenshot.
+rho can tell which page you were on without any extension, by reading the
+address bar through Windows accessibility. That works, but it's approximate:
+what it reads is the *display* text, not the real URL, and it can't see into
+app-mode windows at all.
 
-### The parts worth knowing about
+The extension makes it exact. It's unpacked for now:
 
-**`src/main/win32/`** — koffi bindings to `user32`/`kernel32`/`dwmapi`. koffi
-ships a prebuilt Node-API binary, so there's no node-gyp, no electron-rebuild
-and no compiler needed. It must stay external to the bundler and unpacked from
-the asar, which `electron-builder.yml` handles.
+1. Open `chrome://extensions` and turn on **Developer mode**
+2. **Load unpacked** → choose the `extension/` folder
+3. Open the extension's options and paste the pairing token from rho's Settings
 
-Window bounds come from `DWMWA_EXTENDED_FRAME_BOUNDS`, not `GetWindowRect`.
-`GetWindowRect` includes an invisible ~8px resize border, overhangs the monitor
-when maximized, and — because it respects the process's DPI awareness — reports
-virtualized coordinates. DWM always gives the true visible frame in real pixels.
+Works in Chrome and Edge. It only ever sends the active tab's URL and title, to
+`127.0.0.1`, and rho rejects anything without the token.
 
-**`src/main/capture/`** — captures the whole screen and crops, rather than
-asking `desktopCapturer` for window sources. Window enumeration thumbnails
-*every* open window before returning any of them. The overlay keeps itself out
-of its own screenshot via `setContentProtection(true)`, reapplied on every
-show because Windows has been known to drop it across hide/show.
+## Privacy
 
-**`src/main/url/`** — two ways to know which page a browser is on. The
-extension in `extension/` pushes the real URL as tabs change, so it's already
-in memory when the hotkey fires. Without it, a long-lived PowerShell sidecar
-reads the address bar through UI Automation: ~740ms on the first read while
-Chrome spins up its accessibility tree, ~16ms after that.
+rho is entirely local. There is no account, no telemetry, and nothing leaves
+your machine. Notes are files in a folder you chose.
 
-Be honest about the fallback's limits. It returns the omnibox *display string*,
-not a URL — no scheme, `www.` hidden, and whatever you've half-typed if you're
-mid-edit. It sees nothing in `--app`-mode PWA windows or an elevated browser.
-And it switches Chrome into accessibility mode, which costs it some memory;
-Settings can turn it off and key notes by window title instead.
+Two things worth knowing:
 
-**`src/main/context/resolve.ts`** — turns a window into a stable key, falling
-through URL → title → app so there's always something to bind to. Notes record
-every key they've been seen under, so one created before the URL was known gets
-adopted rather than forked once it is.
+- Screenshots of your windows are stored alongside your notes. Turn it off in
+  Settings if you'd rather not.
+- Reading browser addresses switches Chrome into accessibility mode, which costs
+  Chrome some memory. Turning it off falls back to keying notes by window title.
 
-## The browser extension
+## Development
 
-Unpacked, for now: `chrome://extensions` → Developer mode → Load unpacked →
-pick `extension/`. Open its options page and paste the pairing token from rho's
-Settings. It binds to `127.0.0.1` only and won't accept anything without the
-token, because any page in any tab can reach a localhost port.
+```bash
+npm run dev        # run the app with hot reload
+npm test           # unit tests
+npm run typecheck  # main + renderer
+npm run build      # typecheck and bundle
+npm run dist       # NSIS installer into dist/
+```
 
-## Known edges
+The UI can be worked on in an ordinary browser — no Electron needed:
 
-- A hotkey registered with `RegisterHotKey` *does* fire over an elevated
-  window, and the title, bounds and overlay all still work there. Only the UIA
-  URL read fails against an elevated browser.
-- Content protection also hides the overlay from screen shares and recordings.
-  For a private notes overlay that's the point, but it is deliberate.
-- A window straddling two monitors with different scale factors can't be
-  represented exactly in DIP space; rho snaps to the monitor containing it and
-  overscans the bitmap by a pixel to avoid a visible seam.
-- Focus on the desktop lands on a cloaked 1×1 shell helper rather than a real
-  window. rho opens a centered panel in that case instead of doing nothing.
-- Hiding the overlay does not always move the foreground with it, so rho skips
-  windows that are invisible or belong to its own process. Otherwise the press
-  after a dismiss binds a note to rho's own overlay.
-- A maximized window has no room on screen for the flip margin, so the turn is
-  clipped at the display edge. Unavoidable, and unnoticeable in practice —
-  there is no visible surround on a maximized window anyway.
+```bash
+npx vite src/renderer
+```
+
+Then open `/library/index.html` or `/overlay/index.html`. A dev-only mock stands
+in for the desktop side with sample notes.
+
+```
+src/
+├─ main/        Electron main — hotkey, Win32, capture, storage
+├─ preload/     the bridge between the two
+├─ renderer/    overlay window, library window, shared editor
+└─ shared/      types used by both sides
+extension/      the optional browser extension
+docs/           architecture notes and screenshots
+```
+
+For how the flip works, why notes bind the way they do, and the measurements
+behind the timings, see **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
+
+## Status
+
+Early access, and honest about it. The core loop — hotkey, turn, type, save,
+find it again — works, but expect rough edges. Bug reports and pull requests
+are welcome; [open an issue](https://github.com/PranavBarthwal/rho/issues) with
+what you were doing and what happened.
+
+Windows only. The window-turning depends on Win32 and DWM, so a Mac or Linux
+port would be a rewrite of the parts that matter, not a flag.
+
+## License
+
+[MIT](LICENSE) © Pranav Barthwal
