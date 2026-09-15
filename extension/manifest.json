@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "rho tab reporter",
+  "version": "0.1.0",
+  "description": "Tells the rho desktop app which tab is active, so notes bind to the exact page rather than a guessed window title.",
+  "permissions": ["tabs", "storage", "alarms"],
+  "host_permissions": ["http://127.0.0.1/*"],
+  "background": { "service_worker": "background.js" },
+  "options_page": "options.html"
+}

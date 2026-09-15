@@ -1,0 +1,375 @@
+/*
+ * The flip.
+ *
+ * Two hard rules govern everything here.
+ *
+ * The editor must be focusable from the first frame, so the hidden face is
+ * hidden with transform and opacity only — display:none and visibility:hidden
+ * make an element unfocusable and would silently swallow the first keystrokes.
+ *
+ * And the animation must stay on the compositor, so only transform and opacity
+ * are animated. No backdrop-filter across the full window: it collapses to
+ * ~20fps on integrated graphics.
+ *
+ * The motion is modelled on Apple's, which means two things people usually
+ * miss. Real springs, not ease curves — the card turns slightly past its
+ * destination and settles back. And real perspective: a 1200px focal length on
+ * a ~1500px card makes the near edge swing toward you and the far edge recede,
+ * which is the whole difference between an object turning over and a billboard
+ * spinning.
+ */
+
+@import '../shared/tokens.css';
+@import '../shared/editor.css';
+
+:root {
+  --radius: 16px;
+
+  /* Durations. The turn cannot start until the window has been photographed,
+     which costs ~270ms, so it has to be brisk to keep the whole gesture under
+     three quarters of a second. Closing must not stand between you and
+     getting back to work. */
+  --flip-in: 430ms;
+  --flip-out: 240ms;
+
+  /* SwiftUI .spring(response: 0.42, dampingFraction: 0.78), solved and
+     emitted as stops. Peaks 2% past the target, then settles. */
+  --spring: linear(
+    0, 0.0288, 0.1004, 0.1969, 0.3049, 0.4147, 0.5199, 0.6163, 0.7016, 0.7748,
+    0.8361, 0.886, 0.9255, 0.9561, 0.9789, 0.9954, 1.0066, 1.0138, 1.0179,
+    1.0197, 1.0198, 1.0188, 1.0172, 1.0151, 1.0129, 1.0108, 1.0087, 1.0069, 1
+  );
+  /* Apple's decelerate curve, for the way out. */
+  --ease-out: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: transparent;
+}
+
+body {
+  font-size: 15px;
+  line-height: 1.6;
+  user-select: none;
+  cursor: default;
+}
+
+/*
+ * The stage fills the whole overlay window, which is deliberately larger than
+ * the window being flipped. The surplus is what the card turns through.
+ * Clicking it dismisses, so the margin is a target rather than dead space.
+ */
+.stage {
+  position: relative;
+  height: 100%;
+  width: 100%;
+}
+
+/*
+ * The card's actual footprint: exactly over the window being flipped. The
+ * perspective lives here rather than on the stage so its origin is the centre
+ * of the card, not the centre of the padded window.
+ */
+.frame {
+  position: absolute;
+  perspective-origin: 50% 50%;
+}
+
+/*
+ * The space the window leaves behind as it turns.
+ *
+ * This is what makes the illusion work at all. The real window is still
+ * sitting there, untouched, behind our transparent overlay — so the moment the
+ * card rotates far enough to stop covering its own rectangle, the untouched
+ * window shows through and the card reads as a second panel flipping in front
+ * of the window rather than as the window itself.
+ *
+ * The recess is exactly the card's size and sits directly behind it, so it is
+ * completely hidden at rest and is revealed only by the turn. No fade: it must
+ * already be opaque on the first animated frame, and the card covers it then.
+ */
+.recess {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius);
+  overflow: hidden;
+  /* The fallback when there is no screenshot: lit slightly from above and
+     falling away, so it reads as a recess rather than a hole cut in the
+     screen. */
+  background: radial-gradient(125% 100% at 50% 0%, #1c1d23 0%, #0b0b0e 62%);
+  opacity: 0;
+}
+
+/*
+ * A heavily blurred, darkened echo of the window.
+ *
+ * Flat black is honest but harsh — edge-on, it fills most of the screen. This
+ * is softer and reads as depth. Blurring it this far is what stops it being
+ * mistaken for the sharp duplicate the recess exists to hide; it is scaled up
+ * past the edges so the blur has material to sample and does not fade out at
+ * the rim.
+ */
+.recess img {
+  position: absolute;
+  inset: -8%;
+  width: 116%;
+  height: 116%;
+  object-fit: cover;
+  filter: blur(28px) brightness(0.28) saturate(0.75);
+}
+
+/* Vignette and rim light, above the echo rather than under it. */
+.recess::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    inset 0 3px 14px rgba(0, 0, 0, 0.9),
+    inset 0 0 70px rgba(0, 0, 0, 0.55);
+}
+
+.frame.is-flipping .recess {
+  opacity: 1;
+}
+
+/*
+ * Depth is a separate layer from rotation so each can have its own timing.
+ * The card pulls away from the viewer through the turn and comes back — the
+ * arc a real object traces — which a single interpolated transform cannot do.
+ */
+.depth {
+  height: 100%;
+  width: 100%;
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+.depth.is-opening {
+  animation: depth-in var(--flip-in) cubic-bezier(0.45, 0, 0.55, 1) both;
+}
+
+.depth.is-closing {
+  animation: depth-out var(--flip-out) var(--ease-out) both;
+}
+
+@keyframes depth-in {
+  0%,
+  100% {
+    transform: translateZ(0);
+  }
+  /* 1200 / (1200 + 95) = 0.927 — the card recedes to 93% at the halfway turn. */
+  50% {
+    transform: translateZ(-95px);
+  }
+}
+
+@keyframes depth-out {
+  0%,
+  100% {
+    transform: translateZ(0);
+  }
+  50% {
+    transform: translateZ(-55px);
+  }
+}
+
+.card {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  transform-style: preserve-3d;
+  transform: rotateY(0deg);
+  transition: transform var(--flip-out) var(--ease-out);
+  will-change: transform;
+}
+
+.card.flipped {
+  transform: rotateY(180deg);
+  transition-duration: var(--flip-in);
+  transition-timing-function: var(--spring);
+}
+
+.face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+/* Front: the window we are turning over. */
+
+/*
+ * Opaque, even though the screenshot normally covers it completely. When
+ * capture is off or has failed there is no picture of the window to turn, and
+ * a transparent front face would show the untouched window straight through
+ * the rotation — the exact ghosting the recess exists to prevent.
+ */
+.face--front {
+  background: #17181c;
+}
+
+.face--front img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* The bitmap is overscanned a pixel on each side to cover the rounding
+     error in the physical-to-DIP conversion; cover hides the difference. */
+  object-fit: cover;
+}
+
+/*
+ * Specular sweep. Light catching the surface as it turns away — the cue that
+ * sells the face as a physical panel rather than a texture.
+ */
+.sheen {
+  position: absolute;
+  inset: -20%;
+  pointer-events: none;
+  background: linear-gradient(
+    105deg,
+    transparent 38%,
+    rgba(255, 255, 255, 0.5) 50%,
+    transparent 62%
+  );
+  opacity: 0;
+}
+
+.card.flipped .sheen {
+  animation: sheen var(--flip-in) ease-out;
+}
+
+@keyframes sheen {
+  0% {
+    opacity: 0;
+    transform: translateX(-24%);
+  }
+  40% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(22%);
+  }
+}
+
+/* Back: the note. */
+
+.face--back {
+  transform: rotateY(180deg);
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+  box-shadow:
+    0 0 0 1px var(--line-2),
+    var(--sh-3);
+}
+
+/*
+ * A single hairline bar naming what the note is attached to. It is the only
+ * chrome on the surface: the whole point is that you are already where you
+ * meant to be, so there is nothing here to navigate.
+ */
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 12px 18px 11px;
+  border-bottom: 1px solid var(--line-2);
+  flex: 0 0 auto;
+  min-width: 0;
+  background: linear-gradient(var(--card), #fdfbf5);
+}
+
+.meta__mark {
+  font-family: var(--serif);
+  font-size: 15px;
+  line-height: 1;
+  color: var(--ember);
+  flex: 0 0 auto;
+}
+
+.meta__app {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink-2);
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+.meta__title {
+  font-size: 12.5px;
+  color: var(--faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Fades in on each write and out again; the only report that saving happened. */
+.meta__saved {
+  font-size: 11px;
+  color: var(--faint);
+  opacity: 0;
+  transition: opacity 200ms var(--ease);
+  flex: 0 0 auto;
+}
+
+.meta__saved.is-on {
+  opacity: 1;
+}
+
+.meta__hint {
+  flex: 0 0 auto;
+  line-height: 1;
+}
+
+.meta__hint kbd {
+  font-family: var(--sans);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--faint);
+  background: #15121910;
+  border-radius: 5px;
+  padding: 3px 6px;
+}
+
+/* Small windows have no room for chrome. */
+@media (max-height: 280px) {
+  .meta {
+    padding: 7px 12px 6px;
+  }
+  .meta__hint,
+  .meta__saved {
+    display: none;
+  }
+  .ProseMirror {
+    padding: 11px 14px 14px;
+    font-size: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .card.flipped {
+    transition-duration: 1ms;
+  }
+  .depth.is-opening,
+  .depth.is-closing,
+  .card.flipped .sheen {
+    animation: none;
+  }
+}

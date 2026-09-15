@@ -1,0 +1,23 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>rho</title>
+<style>
+  body { font: 14px/1.6 system-ui, sans-serif; margin: 28px; max-width: 460px; color: #1b1c20; }
+  h1 { font-size: 16px; }
+  input { width: 100%; padding: 8px 10px; font: inherit; border: 1px solid #ccc; border-radius: 6px; }
+  button { margin-top: 12px; padding: 7px 14px; font: inherit; border-radius: 6px; border: 1px solid #ccc; background: #fff; cursor: pointer; }
+  p.small { color: #666; font-size: 12px; }
+  #status { margin-top: 12px; font-size: 13px; }
+</style>
+<h1>rho pairing</h1>
+<p class="small">
+  Paste the pairing token from rho's settings screen. Until this matches, rho falls back to reading
+  the address bar, which is slower and less accurate.
+</p>
+<label>
+  Pairing token
+  <input id="token" type="text" autocomplete="off" spellcheck="false" />
+</label>
+<button id="save">Save</button>
+<div id="status"></div>
+<script src="options.js"></script>

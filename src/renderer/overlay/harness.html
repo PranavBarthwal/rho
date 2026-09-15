@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>rho flip harness</title>
+    <!--
+      A development harness for the flip, not part of the build — only the
+      entry points named in electron.vite.config.ts are bundled.
+
+      The animation is otherwise almost impossible to inspect: the overlay
+      excludes itself from every screen-capture pipeline, and its front face is
+      a screenshot of the very window it is covering, so a still frame of the
+      real thing is ambiguous. This loads the real overlay.css against the real
+      markup, over a stand-in window, and adds a scrubber so any angle can be
+      held still and looked at.
+    -->
+    <!-- Imported as a module, not linked: the dev server transforms CSS into
+         a JS module, so a <link> would receive JavaScript and apply nothing. -->
+    <script type="module">
+      import './overlay.css'
+    </script>
+    <style>
+      /* overlay.css makes body transparent, as the real overlay needs. The
+         stand-in desktop behind the card gets its own layer. */
+      .desktop {
+        position: fixed;
+        inset: 0;
+        z-index: -1;
+        background: #6a7b8c;
+        background-image:
+          radial-gradient(at 20% 30%, #8fa3b5 0, transparent 55%),
+          radial-gradient(at 80% 70%, #55636f 0, transparent 55%);
+      }
+      /* The harness has no bitmap, so mimic the app's blurred echo. */
+      .recess .fake-window {
+        position: absolute;
+        inset: -8%;
+        width: 116%;
+        height: 116%;
+        filter: blur(28px) brightness(0.28) saturate(0.75);
+      }
+      .real-window {
+        position: absolute;
+        border-radius: var(--radius);
+        overflow: hidden;
+        box-shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+      }
+      /* Stand-in for the window being flipped. */
+      .fake-window {
+        width: 100%;
+        height: 100%;
+        background: #fdfdfd;
+        display: flex;
+        flex-direction: column;
+        font-family: 'Segoe UI', system-ui, sans-serif;
+      }
+      .fake-window header {
+        height: 38px;
+        background: #ececf0;
+        border-bottom: 1px solid #dcdce2;
+        display: flex;
+        align-items: center;
+        padding: 0 14px;
+        gap: 8px;
+        font-size: 12px;
+        color: #55555c;
+        flex: 0 0 auto;
+      }
+      .dot {
+        width: 11px;
+        height: 11px;
+        border-radius: 50%;
+        background: #d8d8de;
+      }
+      .fake-window .body {
+        flex: 1;
+        padding: 22px 26px;
+        color: #2a2a30;
+        line-height: 1.7;
+        font-size: 14px;
+      }
+      .fake-window .body b {
+        display: block;
+        font-size: 19px;
+        margin-bottom: 10px;
+      }
+      .bar {
+        height: 9px;
+        border-radius: 5px;
+        background: #e8e8ee;
+        margin: 9px 0;
+      }
+
+      .panel {
+        position: fixed;
+        z-index: 99;
+        left: 16px;
+        bottom: 16px;
+        background: rgba(20, 20, 24, 0.92);
+        color: #eee;
+        padding: 12px 16px;
+        border-radius: 12px;
+        font: 12px/1.5 ui-monospace, Consolas, monospace;
+        display: flex;
+        gap: 14px;
+        align-items: center;
+        backdrop-filter: blur(12px);
+      }
+      .panel button {
+        font: inherit;
+        padding: 6px 12px;
+        border-radius: 7px;
+        border: 1px solid #454550;
+        background: #26262e;
+        color: #eee;
+        cursor: pointer;
+      }
+      .panel button:hover {
+        background: #32323c;
+      }
+      .panel input[type='range'] {
+        width: 220px;
+      }
+      #angle {
+        min-width: 58px;
+        color: #9fd6ff;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="desktop"></div>
+
+    <!--
+      The untouched real window, sitting exactly where the card sits.
+
+      This is the whole point of the harness. In the real app this window
+      belongs to another process and keeps being painted throughout the turn;
+      nothing rho does moves it. If it is ever visible during the flip, the
+      card reads as a second panel rotating in front of the window instead of
+      as the window itself. It must stay hidden behind the recess.
+    -->
+    <div class="real-window" id="realWindow">
+      <div class="fake-window">
+        <header>
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          <span style="margin-left: 8px">Some Article — Browser</span>
+        </header>
+        <div class="body">
+          <b>The window being turned over</b>
+          <div class="bar" style="width: 88%"></div>
+          <div class="bar" style="width: 74%"></div>
+          <div class="bar" style="width: 91%"></div>
+          <div class="bar" style="width: 61%"></div>
+          <div class="bar" style="width: 80%"></div>
+          <div class="bar" style="width: 45%"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div class="frame" id="frame">
+        <div class="recess">
+          <!-- Stands in for the captured screenshot the app puts here. -->
+          <div class="fake-window"></div>
+        </div>
+        <div class="depth" id="depth">
+          <div class="card" id="card">
+            <div class="face face--front">
+              <div class="fake-window">
+                <header>
+                  <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+                  <span style="margin-left: 8px">Some Article — Browser</span>
+                </header>
+                <div class="body">
+                  <b>The window being turned over</b>
+                  <div class="bar" style="width: 88%"></div>
+                  <div class="bar" style="width: 74%"></div>
+                  <div class="bar" style="width: 91%"></div>
+                  <div class="bar" style="width: 61%"></div>
+                  <div class="bar" style="width: 80%"></div>
+                  <div class="bar" style="width: 45%"></div>
+                </div>
+              </div>
+              <div class="sheen" id="sheen"></div>
+            </div>
+
+            <div class="face face--back">
+              <div class="meta">
+                <span class="meta__app">chrome</span>
+                <span class="meta__title">example.com/some-article</span>
+                <span class="meta__hint">esc</span>
+              </div>
+              <textarea class="editor" placeholder="Type…">
+Pricing page is buried three clicks deep.
+Worth surfacing in the nav.</textarea
+              >
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <button id="flip">Flip (430ms)</button>
+      <button id="back">Close (240ms)</button>
+      <label><input type="checkbox" id="scrub" /> scrub</label>
+      <input type="range" id="deg" min="0" max="180" value="0" disabled />
+      <span id="angle">0°</span>
+    </div>
+
+    <script>
+      const card = document.getElementById('card')
+      const depth = document.getElementById('depth')
+      const frame = document.getElementById('frame')
+      const deg = document.getElementById('deg')
+      const angle = document.getElementById('angle')
+      const scrub = document.getElementById('scrub')
+
+      // Lay the card out 1:1 against the real viewport rather than scaling a
+      // fixed virtual size down — a downscaled render blurs exactly the
+      // details worth judging here (hairlines, radii, type).
+      const PANEL = 84
+      function layout() {
+        const vw = innerWidth
+        const vh = innerHeight - PANEL
+        // The margin the card turns through, proportional so it reads the same
+        // on any viewport. Matches FLIP_MARGIN's role in the app.
+        const M = Math.max(24, Math.min(120, Math.round(Math.min(vw, vh) * 0.09)))
+        const w = vw - M * 2
+        const h = vh - M * 2
+        frame.style.left = M + 'px'
+        frame.style.top = M + 'px'
+        frame.style.width = w + 'px'
+        frame.style.height = h + 'px'
+        // Matches the app: perspective tied to the card's longest edge.
+        frame.style.perspective = Math.round(Math.max(w, h) * 1.9) + 'px'
+
+        // Exactly under the card, as the real window is in the app.
+        const rw = document.getElementById('realWindow')
+        rw.style.left = M + 'px'
+        rw.style.top = M + 'px'
+        rw.style.width = w + 'px'
+        rw.style.height = h + 'px'
+      }
+      layout()
+      addEventListener('resize', layout)
+
+      function restart(el, cls) {
+        el.classList.remove(cls)
+        void el.offsetWidth
+        el.classList.add(cls)
+      }
+
+      document.getElementById('flip').onclick = () => {
+        card.classList.remove('flipped')
+        depth.classList.remove('is-opening', 'is-closing')
+        frame.classList.remove('is-flipping')
+        void card.offsetWidth
+        requestAnimationFrame(() => {
+          // Recess opaque in the same frame the turn starts, while the card
+          // still covers it — matching the app's ordering.
+          frame.classList.add('is-flipping')
+          card.classList.add('flipped')
+          restart(depth, 'is-opening')
+        })
+      }
+      document.getElementById('back').onclick = () => {
+        card.classList.remove('flipped')
+        restart(depth, 'is-closing')
+        // Recess stays until the card has covered it again.
+        setTimeout(() => frame.classList.remove('is-flipping'), 240)
+      }
+
+      scrub.onchange = () => {
+        deg.disabled = !scrub.checked
+        frame.classList.toggle('is-flipping', scrub.checked)
+        if (scrub.checked) {
+          card.style.transition = 'none'
+          depth.classList.remove('is-opening', 'is-closing')
+          card.classList.remove('flipped')
+          apply()
+        } else {
+          card.style.transition = ''
+          card.style.transform = ''
+        }
+      }
+      function apply() {
+        card.style.transform = 'rotateY(' + deg.value + 'deg)'
+        angle.textContent = deg.value + '°'
+      }
+      deg.oninput = apply
+    </script>
+  </body>
+</html>

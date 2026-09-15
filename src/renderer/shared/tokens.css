@@ -1,0 +1,100 @@
+/*
+ * rho's design tokens, taken from the landing page so the app and the site
+ * are recognisably the same product.
+ *
+ * The palette is warm paper rather than the cool greys most note apps reach
+ * for: #f7f3ec ground, near-black ink with a violet cast, and a single burnt
+ * ember accent used sparingly. Instrument Serif carries display text, Inter
+ * carries everything functional.
+ */
+
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/500.css';
+@import '@fontsource/inter/600.css';
+@import '@fontsource/instrument-serif/400.css';
+@import '@fontsource/instrument-serif/400-italic.css';
+
+:root {
+  /* Surfaces */
+  --paper: #f7f3ec;
+  --paper-2: #efe8dc;
+  --card: #fffdf8;
+
+  /* Ink */
+  --ink: #151219;
+  --ink-2: #221d2a;
+  --soft: #453d4d;
+  --muted: #6f6675;
+  --faint: #9a92a1;
+
+  /* Accent */
+  --ember: #c06a35;
+  --ember-2: #e29a5c;
+  --dusk: #4b4070;
+
+  /* Hairlines, tuned to sit on paper rather than on white */
+  --line: #1512191c;
+  --line-2: #1512190f;
+
+  --r-sm: 9px;
+  --r-md: 14px;
+  --r-lg: 22px;
+
+  --sh-1: 0 1px 2px #1512190d, 0 10px 26px -14px #15121938;
+  --sh-2: 0 2px 4px #1512190d, 0 22px 50px -24px #15121957;
+  --sh-3: 0 40px 90px -36px #1512198c, 0 8px 24px -12px #15121938;
+
+  --sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --serif: 'Instrument Serif', 'Iowan Old Style', Georgia, 'Times New Roman', serif;
+  --mono: ui-monospace, 'SFMono-Regular', 'JetBrains Mono', Menlo, Consolas, monospace;
+
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--sans);
+  /* Inter needs a touch of negative tracking to sit right at UI sizes. */
+  letter-spacing: -0.005em;
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* A shared small-caps label, as used for the section kickers on the site. */
+.kicker {
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+::selection {
+  background: #c06a3529;
+}
+
+/* Scrollbars: present when needed, never furniture. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #15121926;
+  border-radius: 6px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #1512193d;
+  background-clip: content-box;
+}

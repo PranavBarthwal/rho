@@ -1,0 +1,22 @@
+appId: dev.pranav.rho
+productName: rho
+directories:
+  buildResources: resources
+files:
+  - out/**
+  - package.json
+# koffi loads its native binary from disk at runtime; it cannot live inside the
+# asar. The actual .node ships in a per-platform package under @koromix, so
+# that has to be named explicitly — unpacking only `koffi` leaves the loader
+# without the binary it looks for, and it fails in the packaged build only.
+asarUnpack:
+  - '**/node_modules/koffi/**'
+  - '**/node_modules/@koromix/**'
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  perMachine: false
