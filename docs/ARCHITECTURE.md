@@ -190,8 +190,20 @@ the card — the thing that used to bleed through — so any regression is obvio
 To inspect the real overlay instead, launch with `RHO_NO_PROTECT=1`, which lifts
 the content protection that otherwise makes it invisible to screenshots.
 
-`npx electron scripts/shoot.cjs` regenerates the screenshots in `docs/` against
-the mock, so they never contain anything from the machine that took them.
+Two scripts regenerate the media in `docs/`, both against the mock, so neither
+can pick up anything from the machine that ran them:
+
+- `scripts/shoot.cjs` — the still screenshots.
+- `scripts/record.cjs` — the demo GIF. It does not record in real time;
+  `capturePage()` costs tens of milliseconds, so a live capture would drop
+  frames unevenly. Instead the CSS animations are rebuilt as *paused* Web
+  Animations — reading the spring straight out of the stylesheet, so the
+  recording cannot drift from what ships — and stepped one frame at a time.
+  ffmpeg then builds a palette across the whole clip before applying it;
+  quantising per frame would make the flat paper crawl.
+
+  Both phases of the turn fill, and the later one wins, so the closing animation
+  has to be cancelled at setup or it covers the recording from the first frame.
 
 ## Known edges
 

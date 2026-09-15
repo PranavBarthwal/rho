@@ -15,10 +15,10 @@ half-finished sentence.
 
 [Website](https://rho.pranavbarthwal.in) ·
 [Install](#install) ·
-[How it works](#how-it-works) ·
+[Usage](#usage) ·
 [Architecture](docs/ARCHITECTURE.md)
 
-<img src="docs/overlay.png" alt="A note open on the back of a browser window" width="820">
+<img src="docs/demo.gif" alt="A browser window turning over to reveal a note on its back" width="820">
 
 </div>
 
@@ -117,6 +117,8 @@ its place.
 Type `/` at the start of a line for a menu of the same things, for when you
 can't remember which prefix.
 
+<img src="docs/overlay.png" alt="The note surface, with headings, a quote and a to-do list" width="820">
+
 ### The library
 
 <img src="docs/library.png" alt="The rho library, with notes grouped by app" width="820">
@@ -197,6 +199,14 @@ npx vite src/renderer
 
 Then open `/library/index.html` or `/overlay/index.html`. A dev-only mock stands
 in for the desktop side with sample notes.
+
+The images in this README are generated, not hand-captured — so they never
+contain anything from the machine that made them. With that dev server running:
+
+```bash
+npx electron scripts/shoot.cjs    # the still screenshots
+npx electron scripts/record.cjs   # the demo GIF (needs ffmpeg)
+```
 
 ```
 src/
