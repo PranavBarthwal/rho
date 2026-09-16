@@ -325,6 +325,12 @@ export async function setShot(id: string, shotFile: string): Promise<void> {
   await saveNote(note)
 }
 
+/** Absolute path of a note's markdown file, for revealing it in Explorer. */
+export function notePath(id: string): string | null {
+  const entry = index.get(id)
+  return entry ? path.join(root, entry.file) : null
+}
+
 export function listNotes(): IndexEntry[] {
   return [...index.values()].sort((a, b) => b.updated.localeCompare(a.updated))
 }
@@ -359,12 +365,19 @@ export async function deleteNote(id: string): Promise<void> {
   scheduleFlush()
 }
 
-/** Flush pending index writes before quitting. */
+/**
+ * Flush pending index writes before quitting.
+ *
+ * A second instance quits before it ever opens the store, so root is still
+ * empty there — without this the index would be written to a relative path and
+ * land wherever the app happened to be launched from.
+ */
 export async function shutdownStore(): Promise<void> {
   if (flushTimer) {
     clearTimeout(flushTimer)
     flushTimer = null
   }
+  if (!root) return
   await flushIndex()
 }
 

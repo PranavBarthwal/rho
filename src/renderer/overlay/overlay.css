@@ -25,11 +25,16 @@
 :root {
   --radius: 16px;
 
+  /* How thick the card is. Only seen for the couple of frames either side of
+     edge-on, which is exactly when it matters. */
+  --thick: 7px;
+  --half-thick: 3.5px;
+
   /* Durations. The turn cannot start until the window has been photographed,
      which costs ~270ms, so it has to be brisk to keep the whole gesture under
      three quarters of a second. Closing must not stand between you and
      getting back to work. */
-  --flip-in: 430ms;
+  --flip-in: 460ms;
   --flip-out: 240ms;
 
   /* SwiftUI .spring(response: 0.42, dampingFraction: 0.78), solved and
@@ -142,12 +147,24 @@ body {
 .frame.is-flipping .recess {
   opacity: 1;
 }
-
 /*
- * Depth is a separate layer from rotation so each can have its own timing.
- * The card pulls away from the viewer through the turn and comes back — the
- * arc a real object traces — which a single interpolated transform cannot do.
+ * Everything below is one motion, split across layers only because a single
+ * transform cannot express it.
+ *
+ * All of the layers share one duration and are started in the same frame, and
+ * the ones whose value is linear in the rotation share the spring easing too,
+ * so they stay locked to the angle rather than drifting against it. The ones
+ * that are not linear — the recede, the sheen, the cast shadow — peak at 21%,
+ * which is where the spring actually puts the card edge-on. (Solve the easing
+ * for 0.5: it crosses between its 6th and 7th stops, at t ≈ 0.2075.)
  */
+
+/* The spring is fast out of the gate, so the card is edge-on much earlier than
+   halfway through the wall-clock duration. */
+:root {
+  --edge-on: 21%;
+}
+
 .depth {
   height: 100%;
   width: 100%;
@@ -155,11 +172,11 @@ body {
   will-change: transform;
 }
 
-.depth.is-opening {
-  animation: depth-in var(--flip-in) cubic-bezier(0.45, 0, 0.55, 1) both;
+.frame.is-opening .depth {
+  animation: depth-in var(--flip-in) cubic-bezier(0.4, 0, 0.3, 1) both;
 }
 
-.depth.is-closing {
+.frame.is-closing .depth {
   animation: depth-out var(--flip-out) var(--ease-out) both;
 }
 
@@ -168,9 +185,10 @@ body {
   100% {
     transform: translateZ(0);
   }
-  /* 1200 / (1200 + 95) = 0.927 — the card recedes to 93% at the halfway turn. */
-  50% {
-    transform: translateZ(-95px);
+  /* Deepest exactly as the card passes edge-on, which is what a real object
+     turning on the spot does. */
+  21% {
+    transform: translateZ(-104px);
   }
 }
 
@@ -179,25 +197,57 @@ body {
   100% {
     transform: translateZ(0);
   }
-  50% {
-    transform: translateZ(-55px);
+  45% {
+    transform: translateZ(-58px);
   }
 }
 
+/*
+ * The card is a slab, not a plane.
+ *
+ * The two faces sit half a thickness either side of centre and the two side
+ * edges close the box. It is only a few pixels, and only visible for the
+ * couple of frames either side of edge-on — but an object that vanishes
+ * completely when it turns side-on reads as a texture, and one that shows an
+ * edge reads as a thing.
+ */
 .card {
   position: relative;
   height: 100%;
   width: 100%;
   transform-style: preserve-3d;
   transform: rotateY(0deg);
-  transition: transform var(--flip-out) var(--ease-out);
   will-change: transform;
 }
 
 .card.flipped {
   transform: rotateY(180deg);
-  transition-duration: var(--flip-in);
-  transition-timing-function: var(--spring);
+}
+
+.frame.is-opening .card {
+  animation: flip-in var(--flip-in) var(--spring) both;
+}
+
+.frame.is-closing .card {
+  animation: flip-out var(--flip-out) var(--ease-out) both;
+}
+
+@keyframes flip-in {
+  from {
+    transform: rotateY(0deg);
+  }
+  to {
+    transform: rotateY(180deg);
+  }
+}
+
+@keyframes flip-out {
+  from {
+    transform: rotateY(180deg);
+  }
+  to {
+    transform: rotateY(0deg);
+  }
 }
 
 .face {
@@ -207,6 +257,40 @@ body {
   -webkit-backface-visibility: hidden;
   border-radius: var(--radius);
   overflow: hidden;
+}
+
+.face--front {
+  transform: translateZ(var(--half-thick));
+}
+
+.face--back {
+  transform: rotateY(180deg) translateZ(var(--half-thick));
+}
+
+/* The two edges of the slab. A Y-axis turn only ever exposes these two. */
+.edge {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  width: var(--thick);
+  /* Paper seen end-on: the edge faces the light squarely when the card is
+     side-on, so it is the brightest thing in the frame at that instant — but
+     it is still paper, not a filament. */
+  background: linear-gradient(90deg, #b9b1a4, #ded6c8 44%, #a49c90);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.edge--l {
+  left: 0;
+  transform-origin: left center;
+  transform: rotateY(-90deg) translateZ(var(--half-thick));
+}
+
+.edge--r {
+  right: 0;
+  transform-origin: right center;
+  transform: rotateY(90deg) translateZ(var(--half-thick));
 }
 
 /* Front: the window we are turning over. */
@@ -231,8 +315,72 @@ body {
 }
 
 /*
- * Specular sweep. Light catching the surface as it turns away — the cue that
- * sells the face as a physical panel rather than a texture.
+ * Shading.
+ *
+ * The single biggest thing separating a turning object from a rotating
+ * picture. A real surface angling away from the light loses it, so each face
+ * darkens as it turns edge-on and recovers as it comes back to face you.
+ *
+ * Opacity here is linear in the rotation, so these carry the same spring
+ * easing as the card and track the true angle rather than wall-clock time.
+ * Each runs past what is visible — the front reaches 1.2 only at 180°, where
+ * it has long since been hidden — which is what puts the right value on screen
+ * at the moment the face actually disappears.
+ */
+.shade {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.shade--front {
+  background: linear-gradient(100deg, #0a0a0f 0%, #16121c 60%, #0a0a0f 100%);
+}
+
+.shade--back {
+  background: linear-gradient(260deg, #0a0a0f 0%, #16121c 60%, #0a0a0f 100%);
+}
+
+.frame.is-opening .shade--front {
+  animation: shade-out var(--flip-in) var(--spring) both;
+}
+
+.frame.is-opening .shade--back {
+  animation: shade-in var(--flip-in) var(--spring) both;
+}
+
+.frame.is-closing .shade--front {
+  animation: shade-in var(--flip-out) var(--ease-out) both;
+}
+
+.frame.is-closing .shade--back {
+  animation: shade-out var(--flip-out) var(--ease-out) both;
+}
+
+/* Losing the light. */
+@keyframes shade-out {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1.24;
+  }
+}
+
+/* Finding it again. */
+@keyframes shade-in {
+  from {
+    opacity: 1.24;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/*
+ * Specular sweep. Light catching the surface as it turns — brightest as the
+ * card passes edge-on, which is when a real panel would throw it.
  */
 .sheen {
   position: absolute;
@@ -240,35 +388,34 @@ body {
   pointer-events: none;
   background: linear-gradient(
     105deg,
-    transparent 38%,
-    rgba(255, 255, 255, 0.5) 50%,
-    transparent 62%
+    transparent 36%,
+    rgba(255, 255, 255, 0.58) 50%,
+    transparent 64%
   );
   opacity: 0;
 }
 
-.card.flipped .sheen {
-  animation: sheen var(--flip-in) ease-out;
+.frame.is-opening .sheen {
+  animation: sheen var(--flip-in) ease-out both;
 }
 
 @keyframes sheen {
   0% {
     opacity: 0;
-    transform: translateX(-24%);
+    transform: translateX(-26%);
   }
-  40% {
+  21% {
     opacity: 1;
   }
   100% {
     opacity: 0;
-    transform: translateX(22%);
+    transform: translateX(24%);
   }
 }
 
 /* Back: the note. */
 
 .face--back {
-  transform: rotateY(180deg);
   display: flex;
   flex-direction: column;
   background: var(--card);

@@ -40,6 +40,14 @@ function relativeTime(iso: string): string {
   return new Date(iso).toLocaleDateString()
 }
 
+function wordCount(md: string): number {
+  const words = md
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/[#*`>_~[\]()-]/g, ' ')
+    .trim()
+  return words ? words.split(/\s+/).length : 0
+}
+
 export default function App(): React.JSX.Element {
   const [entries, setEntries] = useState<IndexEntry[]>([])
   const [query, setQuery] = useState('')
@@ -48,8 +56,11 @@ export default function App(): React.JSX.Element {
   const [shot, setShot] = useState<string | null>(null)
   const [settings, setSettings] = useState<SettingsShape | null>(null)
   const [showSettings, setShowSettings] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [words, setWords] = useState(0)
 
   const editorRef = useRef<EditorHandle>(null)
+  const searchRef = useRef<HTMLInputElement>(null)
   const saveTimer = useRef<number | null>(null)
   const editingId = useRef<string | null>(null)
 
@@ -74,6 +85,7 @@ export default function App(): React.JSX.Element {
   // Load the selected note into the editor. The editor is never remounted, so
   // switching notes is a content swap rather than a new instance.
   useEffect(() => {
+    setConfirmDelete(false)
     if (!selectedId) {
       setNote(null)
       setShot(null)
@@ -84,6 +96,7 @@ export default function App(): React.JSX.Element {
     void window.rho.notes.read(selectedId).then(async (n) => {
       if (stale || !n) return
       setNote(n)
+      setWords(wordCount(n.body))
       editingId.current = n.id
       editorRef.current?.setMarkdown(n.body)
       setShot(null)
@@ -109,9 +122,64 @@ export default function App(): React.JSX.Element {
     return [...byApp.entries()].sort((a, b) => b[1].length - a[1].length)
   }, [entries])
 
+  /** The list as it actually reads top to bottom, for arrow-key movement. */
+  const ordered = useMemo(() => grouped.flatMap(([, rows]) => rows), [grouped])
+
+  const step = useCallback(
+    (dir: 1 | -1) => {
+      if (!ordered.length) return
+      const i = ordered.findIndex((e) => e.id === selectedId)
+      const next = i < 0 ? 0 : (i + dir + ordered.length) % ordered.length
+      setSelectedId(ordered[next].id)
+    },
+    [ordered, selectedId]
+  )
+
+  // Window-level shortcuts. Bound on the window so they work wherever focus
+  // is, and stood down while typing so they never eat a keystroke.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      const el = e.target as HTMLElement | null
+      const typing =
+        !!el && (el.isContentEditable || el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'f') {
+        e.preventDefault()
+        setShowSettings(false)
+        searchRef.current?.focus()
+        searchRef.current?.select()
+        return
+      }
+      if (e.key === 'Escape') {
+        if (el === searchRef.current && query) {
+          setQuery('')
+          return
+        }
+        if (confirmDelete) setConfirmDelete(false)
+        return
+      }
+      // Arrows move through the list from the search box too, so you can type
+      // a query and go straight to the result without reaching for the mouse.
+      if (typing && el !== searchRef.current) return
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        step(1)
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        step(-1)
+      } else if (e.key === 'Enter' && el === searchRef.current) {
+        e.preventDefault()
+        editorRef.current?.focusEnd()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [step, query, confirmDelete])
+
   const onEdit = (markdown: string): void => {
     const id = editingId.current
     if (!id) return
+    setWords(wordCount(markdown))
     if (saveTimer.current) window.clearTimeout(saveTimer.current)
     saveTimer.current = window.setTimeout(() => {
       void window.rho.notes.update(id, markdown).then(() => void refresh(query))
@@ -121,6 +189,7 @@ export default function App(): React.JSX.Element {
   const onDelete = async (): Promise<void> => {
     if (!note) return
     await window.rho.notes.remove(note.id)
+    setConfirmDelete(false)
     const rows = await refresh(query)
     setSelectedId(rows[0]?.id ?? null)
   }
@@ -132,35 +201,45 @@ export default function App(): React.JSX.Element {
 
   return (
     <div className="app">
-      <aside className="sidebar">
-        <div className="sidebar__head">
-          <div className="brand">
-            <span className="brand__mark">ρ</span>
-            <span className="brand__name">rho</span>
-          </div>
-          <button
-            className={`icon-btn${showSettings ? ' is-on' : ''}`}
-            onClick={() => setShowSettings((v) => !v)}
-            title="Settings"
-            aria-label="Settings"
-          >
-            ⚙
-          </button>
+      {/* Sits under the native window buttons; doubles as the drag handle. */}
+      <header className="titlebar">
+        <div className="brand">
+          <span className="brand__mark">ρ</span>
+          <span className="brand__name">rho</span>
         </div>
+        <span className="titlebar__count">
+          {entries.length} {entries.length === 1 ? 'note' : 'notes'}
+        </span>
+        <button
+          className={`icon-btn${showSettings ? ' is-on' : ''}`}
+          onClick={() => setShowSettings((v) => !v)}
+          title="Settings"
+          aria-label="Settings"
+        >
+          ⚙
+        </button>
+      </header>
 
-        <input
-          className="search"
-          placeholder="Search everything…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          autoFocus
-        />
+      <aside className="sidebar">
+        <div className="search-wrap">
+          <input
+            ref={searchRef}
+            className="search"
+            placeholder="Search everything…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            autoFocus
+          />
+          <kbd className="search__kbd">Ctrl F</kbd>
+        </div>
 
         <div className="list">
           {grouped.length === 0 ? (
             <p className="empty">
               {query ? (
-                'Nothing matches.'
+                <>
+                  Nothing matches <strong>{query}</strong>.
+                </>
               ) : (
                 <>
                   No notes yet. Press <kbd>{settings?.accelerator ?? 'the hotkey'}</kbd> behind any
@@ -204,27 +283,84 @@ export default function App(): React.JSX.Element {
                   {note ? (note.url ?? note.title) : 'Select a note'}
                 </span>
               </div>
+
               {note ? (
                 <div className="pane__actions">
-                  <button className="btn btn--danger" onClick={() => void onDelete()}>
-                    Delete
+                  {note.url ? (
+                    <button
+                      className="btn"
+                      title="Open the page this note was taken behind"
+                      onClick={() => void window.rho.shell.openUrl(note.url!)}
+                    >
+                      Open page
+                    </button>
+                  ) : null}
+                  <button
+                    className="btn"
+                    title="Show the markdown file in Explorer"
+                    onClick={() => void window.rho.notes.reveal(note.id)}
+                  >
+                    Show file
                   </button>
+                  {confirmDelete ? (
+                    <>
+                      <button className="btn btn--solid" onClick={() => void onDelete()}>
+                        Delete for good
+                      </button>
+                      <button className="btn" onClick={() => setConfirmDelete(false)}>
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <button className="btn btn--danger" onClick={() => setConfirmDelete(true)}>
+                      Delete
+                    </button>
+                  )}
                 </div>
               ) : null}
             </header>
 
-            {shot ? (
-              <div className="pane__shot">
-                <img src={shot} alt="" />
+            {/*
+              Hidden rather than unmounted when nothing is selected. The editor
+              is handed its content imperatively the moment a note loads, so it
+              has to already exist by then — unmounting it means the first note
+              you open arrives before there is anything to put it in.
+            */}
+            <div className="pane__body" hidden={!note}>
+              {shot ? (
+                <div className="pane__shot">
+                  <img src={shot} alt="" />
+                </div>
+              ) : null}
+
+              <Editor ref={editorRef} onChange={onEdit} placeholder="Type / for commands…" />
+
+              <footer className="pane__foot">
+                <span>{words === 1 ? '1 word' : `${words} words`}</span>
+                {note ? (
+                  <>
+                    <span className="pane__dot">·</span>
+                    <span title={new Date(note.updated).toLocaleString()}>
+                      edited {relativeTime(note.updated)}
+                    </span>
+                    <span className="pane__dot">·</span>
+                    <span title={new Date(note.created).toLocaleString()}>
+                      written {relativeTime(note.created)}
+                    </span>
+                  </>
+                ) : null}
+              </footer>
+            </div>
+
+            {!note ? (
+              <div className="pane__blank">
+                <p>
+                  {entries.length
+                    ? 'Select a note, or use ↑ ↓ to move through them.'
+                    : 'Notes you take behind a window show up here.'}
+                </p>
               </div>
             ) : null}
-
-            {/* Kept mounted across selections so the editor is never rebuilt. */}
-            <Editor
-              ref={editorRef}
-              onChange={onEdit}
-              placeholder={note ? 'Type / for commands…' : ''}
-            />
           </>
         )}
       </main>
@@ -302,7 +438,12 @@ function Settings({
       <div className="field">
         <span className="field__label">Notes folder</span>
         <code className="path">{settings.notesRoot}</code>
-        <small>Plain markdown files. Safe to sync, grep, or edit by hand.</small>
+        <div className="field__row">
+          <button className="btn" onClick={() => void window.rho.notes.openFolder()}>
+            Open folder
+          </button>
+          <small>Plain markdown files. Safe to sync, grep, or edit by hand.</small>
+        </div>
       </div>
 
       <div className="field">

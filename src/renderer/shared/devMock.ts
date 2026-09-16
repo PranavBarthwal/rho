@@ -140,8 +140,10 @@ export function installDevMock(): void {
             card: {
               x: m,
               y: m,
-              width: window.innerWidth - m * 2,
-              height: window.innerHeight - m * 2
+              // Floored, because a collapsed browser pane reports a viewport
+              // small enough to produce a zero-sized card.
+              width: Math.max(320, window.innerWidth - m * 2),
+              height: Math.max(200, window.innerHeight - m * 2)
             }
           })
           // No bitmap to turn, so the turn starts on the failure path.
@@ -182,7 +184,15 @@ export function installDevMock(): void {
         }
       },
       remove: async (id: string) => void notes.delete(id),
-      shot: async () => null
+      shot: async () => null,
+      reveal: async () => true,
+      openFolder: async () => ''
+    },
+    shell: {
+      openUrl: async (url: string) => {
+        console.info('[mock] would open', url)
+        return true
+      }
     },
     settings: {
       get: async () => ({

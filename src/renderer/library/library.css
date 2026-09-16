@@ -24,7 +24,41 @@ body {
 .app {
   display: grid;
   grid-template-columns: minmax(268px, 336px) 1fr;
+  grid-template-rows: 44px 1fr;
   height: 100%;
+}
+
+/*
+ * The title bar.
+ *
+ * The window is frameless with the native buttons kept as an overlay, so this
+ * has to leave room for them on the right and be draggable everywhere else —
+ * every interactive thing inside it opts back out of the drag region, or it
+ * would swallow its own clicks.
+ */
+.titlebar {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  background: var(--paper-2);
+  border-bottom: 1px solid var(--line-2);
+  -webkit-app-region: drag;
+  /* Clear of the native minimise / maximise / close buttons. */
+  padding-right: 148px;
+}
+
+.titlebar__count {
+  margin-left: auto;
+  font-size: 11.5px;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.titlebar .icon-btn,
+.titlebar button {
+  -webkit-app-region: no-drag;
 }
 
 /* Sidebar */
@@ -35,13 +69,6 @@ body {
   min-width: 0;
   background: var(--paper-2);
   border-right: 1px solid var(--line-2);
-}
-
-.sidebar__head {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 16px 16px 10px;
 }
 
 .brand {
@@ -98,9 +125,37 @@ body {
   color: var(--ember);
 }
 
+/* The search box, with its shortcut shown until you use it. */
+.search-wrap {
+  position: relative;
+  margin: 12px 14px 10px;
+}
+
+.search__kbd {
+  position: absolute;
+  right: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: var(--sans);
+  font-size: 10px;
+  letter-spacing: 0.03em;
+  color: var(--faint);
+  background: #15121910;
+  border-radius: 5px;
+  padding: 3px 6px;
+  pointer-events: none;
+  transition: opacity 120ms var(--ease);
+}
+
+.search:focus + .search__kbd,
+.search:not(:placeholder-shown) + .search__kbd {
+  opacity: 0;
+}
+
 .search {
-  margin: 4px 14px 10px;
+  width: 100%;
   padding: 8px 12px;
+  padding-right: 58px;
   border-radius: var(--r-sm);
   border: 1px solid var(--line-2);
   background: var(--card);
@@ -437,4 +492,61 @@ small,
   .sidebar {
     max-height: 42vh;
   }
+}
+
+/* Confirming a delete, rather than doing it on a single click. */
+.btn--solid {
+  background: #a33a2a;
+  border-color: #a33a2a;
+  color: #fffdf8;
+}
+
+.btn--solid:hover {
+  background: #8f3124;
+}
+
+/* What the note is, under the note. */
+.pane__foot {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 0 0 auto;
+  padding: 9px 30px 11px;
+  border-top: 1px solid var(--line-2);
+  font-size: 11.5px;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.pane__dot {
+  opacity: 0.55;
+}
+
+.pane__blank p {
+  max-width: 34ch;
+  text-align: center;
+  line-height: 1.7;
+}
+
+.field__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.field__row small {
+  flex: 1;
+}
+
+/* The note, as a column: picture, writing surface, then what it is. */
+.pane__body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* The editor stays mounted with no note selected, so it must really go away. */
+.pane__body[hidden] {
+  display: none;
 }

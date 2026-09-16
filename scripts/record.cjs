@@ -28,11 +28,15 @@ const MARGIN = 115
 const FPS = 25
 const WIDTH = 820 // final GIF width
 
+/** The turn's real durations, matching --flip-in / --flip-out in overlay.css. */
+const IN_MS = 460
+const OUT_MS = 240
+
 /** Frame counts per phase, at FPS. */
 const HOLD_WINDOW = 11
-const FLIP_IN = 11 // 430ms
+const FLIP_IN = Math.round((IN_MS / 1000) * FPS)
 const HOLD_NOTE = 33
-const FLIP_OUT = 6 // 240ms
+const FLIP_OUT = Math.round((OUT_MS / 1000) * FPS)
 const HOLD_END = 8
 
 /** A desktop for the card to sit on, in the palette of the site. */
@@ -102,16 +106,16 @@ const FAKE_CSS = `
  * Reads the spring straight out of the stylesheet, so the recording cannot
  * drift from what the app does.
  */
+/**
+ * Sets the scene, then hands back a way to step the turn.
+ *
+ * The overlay drives the whole flip with CSS animations now, so there is
+ * nothing to rebuild here — the real ones are simply paused and scrubbed.
+ * That removes any chance of the recording drifting from what ships.
+ */
 const DIRECTOR = `
 (() => {
-  const css = getComputedStyle(document.documentElement);
-  const spring = css.getPropertyValue('--spring').trim();
-  const easeOut = css.getPropertyValue('--ease-out').trim();
-
   const frame = document.querySelector('.frame');
-  const card = document.querySelector('.card');
-  const depth = document.querySelector('.depth');
-  const sheen = document.querySelector('.sheen');
   const front = document.querySelector('.face--front');
   const recess = document.querySelector('.recess');
 
@@ -123,75 +127,36 @@ const DIRECTOR = `
   frame.style.height = (innerHeight - M * 2) + 'px';
   frame.style.perspective =
     Math.round(Math.max(innerWidth - M * 2, innerHeight - M * 2) * 1.9) + 'px';
-  frame.classList.add('is-flipping');
 
   const style = document.createElement('style');
-  style.textContent = \`${FAKE_CSS}\`;
+  style.textContent = ${JSON.stringify(FAKE_CSS)};
   document.head.appendChild(style);
 
   // The window being turned over, and its blurred echo in the recess.
   front.querySelectorAll('img').forEach((n) => n.remove());
-  front.insertAdjacentHTML('afterbegin', \`${FAKE_WINDOW}\`);
-  recess.innerHTML = \`${FAKE_WINDOW}\`;
+  front.insertAdjacentHTML('afterbegin', ${JSON.stringify(FAKE_WINDOW)});
+  recess.innerHTML = ${JSON.stringify(FAKE_WINDOW)};
   const echo = recess.firstElementChild;
   echo.style.filter = 'blur(28px) brightness(0.28) saturate(0.75)';
   echo.style.inset = '-8%';
   echo.style.width = '116%';
   echo.style.height = '116%';
 
-  // The card is driven here, so the class-based transition must not fight it.
-  card.classList.remove('flipped');
-  card.style.transition = 'none';
-  depth.classList.remove('is-opening', 'is-closing');
-
-  const mk = (el, frames, duration, easing) => {
-    const a = el.animate(frames, { duration, easing, fill: 'both' });
-    a.pause();
-    return a;
-  };
-
-  const IN = ${(FLIP_IN / FPS) * 1000};
-  const OUT = ${(FLIP_OUT / FPS) * 1000};
-
-  const phases = {
-    in: [
-      mk(card, [{ transform: 'rotateY(0deg)' }, { transform: 'rotateY(180deg)' }], IN, spring),
-      mk(depth, [
-        { transform: 'translateZ(0)' },
-        { transform: 'translateZ(-95px)' },
-        { transform: 'translateZ(0)' }
-      ], IN, 'cubic-bezier(0.45, 0, 0.55, 1)'),
-      mk(sheen, [
-        { opacity: 0, transform: 'translateX(-24%)' },
-        { opacity: 1, offset: 0.4 },
-        { opacity: 0, transform: 'translateX(22%)' }
-      ], IN, 'ease-out')
-    ],
-    out: [
-      mk(card, [{ transform: 'rotateY(180deg)' }, { transform: 'rotateY(0deg)' }], OUT, easeOut),
-      mk(depth, [
-        { transform: 'translateZ(0)' },
-        { transform: 'translateZ(-55px)' },
-        { transform: 'translateZ(0)' }
-      ], OUT, easeOut)
-    ]
-  };
-
-  // Both phases fill, and the later one wins — so the 'out' animation, which
-  // starts at 180deg, would otherwise cover the whole recording from frame one.
-  // Only the active phase may be live.
-  phases.out.forEach((a) => a.cancel());
-  let active = 'in';
   window.__phase = (name, t) => {
-    if (name !== active) {
-      phases[active].forEach((a) => a.cancel());
-      active = name;
+    // React owns this class list, so reassert it rather than trusting it to
+    // stay put across a re-render.
+    const want = 'frame is-flipping ' + (name === 'in' ? 'is-opening' : 'is-closing');
+    if (frame.className !== want) {
+      frame.className = want;
+      // Force the new animations into existence before they are scrubbed.
+      void frame.offsetWidth;
     }
-    phases[name].forEach((a) => {
-      if (a.playState === 'idle') a.pause();
+    frame.getAnimations({ subtree: true }).forEach((a) => {
+      a.pause();
       a.currentTime = t;
     });
   };
+
   window.__phase('in', 0);
   return true;
 })()
@@ -201,12 +166,21 @@ app.on('window-all-closed', () => {})
 
 app.whenReady().then(async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'rho-rec-'))
+  /*
+   * Shown, but parked off the side of the desktop. A window with show:false
+   * composites lazily and hands back frames where some layers never repainted,
+   * which in a recording shows up as parts of the card lagging the rest.
+   */
   const win = new BrowserWindow({
     ...WIN,
+    x: -WIN.width - 200,
+    y: 0,
     show: false,
+    skipTaskbar: true,
     backgroundColor: '#262232',
     webPreferences: { backgroundThrottling: false }
   })
+  win.showInactive()
 
   try {
     await win.loadURL(URL)
@@ -219,9 +193,6 @@ app.whenReady().then(async () => {
   // before the scene is taken over.
   await new Promise((r) => setTimeout(r, 3000))
   await win.webContents.executeJavaScript(DIRECTOR)
-
-  const IN_MS = (FLIP_IN / FPS) * 1000
-  const OUT_MS = (FLIP_OUT / FPS) * 1000
 
   /** The whole loop, as (phase, time) pairs — one entry per frame. */
   const timeline = []

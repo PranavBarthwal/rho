@@ -54,7 +54,14 @@ const api = {
     read: (id: string): Promise<Note | null> => ipcRenderer.invoke('notes:read', id),
     update: (id: string, body: string) => ipcRenderer.invoke('notes:update', id, body),
     remove: (id: string) => ipcRenderer.invoke('notes:delete', id),
-    shot: (rel: string): Promise<string | null> => ipcRenderer.invoke('notes:shot', rel)
+    shot: (rel: string): Promise<string | null> => ipcRenderer.invoke('notes:shot', rel),
+    /** Show the note's markdown file in Explorer. */
+    reveal: (id: string): Promise<boolean> => ipcRenderer.invoke('notes:reveal', id),
+    openFolder: (): Promise<string> => ipcRenderer.invoke('notes:openFolder')
+  },
+  shell: {
+    /** Open the page a note was taken behind. Validated in the main process. */
+    openUrl: (url: string): Promise<boolean> => ipcRenderer.invoke('shell:openUrl', url)
   },
   settings: {
     get: () => ipcRenderer.invoke('settings:get'),

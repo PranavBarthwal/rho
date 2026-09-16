@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Menu, Tray, nativeImage, dialog } from 'electron'
+import { app, BrowserWindow, ipcMain, Menu, Tray, nativeImage, dialog, shell } from 'electron'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
 import { join } from 'node:path'
 import { initLog, log, logPath } from './log'
@@ -6,7 +6,17 @@ import { createOverlay, whenOverlayReady } from './overlay/overlayWindow'
 import { showLibrary } from './library/libraryWindow'
 import { currentHotkey, registerWithFallback, unregisterHotkey } from './hotkey'
 import { dismissOverlay, toggleOverlay } from './session'
-import { deleteNote, initStore, listNotes, readNote, searchNotes, shutdownStore, updateBody } from './store/notes'
+import {
+  deleteNote,
+  initStore,
+  listNotes,
+  notePath,
+  notesRoot,
+  readNote,
+  searchNotes,
+  shutdownStore,
+  updateBody
+} from './store/notes'
 import { readShot } from './capture/screenCapture'
 import { getSettings, loadSettings, saveSettings } from './settings'
 import { setUiaEnabled, startUiaSidecar, stopUiaSidecar } from './url/uiaSidecar'
@@ -85,6 +95,36 @@ function registerIpc(): void {
   ipcMain.handle('notes:update', (_e, id: string, body: string) => updateBody(id, body))
   ipcMain.handle('notes:delete', (_e, id: string) => deleteNote(id))
   ipcMain.handle('notes:shot', (_e, rel: string) => readShot(rel))
+
+  // Show the note where it actually lives. The files being real files is the
+  // point of the storage design, so getting to one should be one click.
+  ipcMain.handle('notes:reveal', (_e, id: string) => {
+    const file = notePath(id)
+    if (file) shell.showItemInFolder(file)
+    return !!file
+  })
+  ipcMain.handle('notes:openFolder', () => shell.openPath(notesRoot()))
+  /*
+   * Opening the page a note was taken behind.
+   *
+   * Only ever http(s). The stored address comes from a browser window — and
+   * when it comes from the accessibility fallback it is a display string the
+   * browser rendered, not something rho validated — so it is matched against a
+   * strict shape here rather than handed to the shell on trust. Anything that
+   * is not plainly a web address is dropped.
+   */
+  ipcMain.handle('shell:openUrl', (_e, url: string) => {
+    const raw = String(url ?? '').trim()
+    if (/^https?:\/\/[^\s]+$/i.test(raw)) {
+      void shell.openExternal(raw)
+      return true
+    }
+    if (/^[\w.-]+\.[a-z]{2,}(\/[^\s]*)?$/i.test(raw)) {
+      void shell.openExternal(`https://${raw}`)
+      return true
+    }
+    return false
+  })
 
   ipcMain.handle('settings:get', () => ({
     ...getSettings(),

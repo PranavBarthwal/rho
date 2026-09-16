@@ -34,11 +34,13 @@ const SHOTS = [
     width: 1240,
     height: 800,
     // Show the note with the most formatting rather than whichever sorts first.
-    setup: `
+    setup: `(() => {
       const row = [...document.querySelectorAll('.row')]
         .find(r => r.innerText.includes('attention-residue'));
-      if (row) row.click();
-    `
+      if (!row) return 'NOT FOUND';
+      row.click();
+      return row.textContent.slice(0, 44);
+    })()`
   },
   {
     name: 'overlay',
@@ -61,13 +63,27 @@ app.whenReady().then(async () => {
 
   for (const shot of SHOTS) {
     try {
+    /*
+     * Shown, but parked off the side of the desktop.
+     *
+     * A window with show:false composites lazily: capturePage hands back a
+     * frame where some layers have repainted and others have not, so the
+     * editor can show one note while the header still shows the last. The DOM
+     * is correct — only the pixels are stale. Showing it fixes that, and
+     * putting it off-screen keeps it from flashing over whatever the person
+     * running this is doing.
+     */
     const win = new BrowserWindow({
       width: shot.width,
       height: shot.height,
+      x: -shot.width - 200,
+      y: 0,
       show: false,
+      skipTaskbar: true,
       backgroundColor: '#f7f3ec',
       webPreferences: { backgroundThrottling: false }
     })
+    win.showInactive()
 
     // Loading straight after destroying the previous window occasionally
     // fails with ERR_FAILED; one retry clears it.
@@ -80,8 +96,14 @@ app.whenReady().then(async () => {
     if (shot.css) await win.webContents.insertCSS(shot.css)
     // Long enough for fonts, the mock's opening session, and the turn.
     await new Promise((r) => setTimeout(r, 2600))
-    if (shot.setup) await win.webContents.executeJavaScript(shot.setup)
-    await new Promise((r) => setTimeout(r, 700))
+    if (shot.setup) {
+      const picked = await win.webContents.executeJavaScript(shot.setup)
+      console.log(`  selected: ${picked}`)
+    }
+    // The note is loaded into the editor asynchronously after the click.
+    await new Promise((r) => setTimeout(r, 1400))
+
+    await new Promise((r) => setTimeout(r, 300))
 
     const image = await win.webContents.capturePage()
     const file = path.join(OUT, `${shot.name}.png`)

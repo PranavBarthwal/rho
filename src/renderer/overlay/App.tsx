@@ -8,16 +8,17 @@ const SAVE_DEBOUNCE_MS = 300
 const FLIP_OUT_MS = 240
 
 /**
- * How long to hold still waiting for the screenshot before turning anyway.
+ * How long to hold still waiting for the picture before turning anyway.
  *
  * Nothing is drawn while we wait — the overlay is transparent, so the window
  * sits there looking untouched, which is the honest thing to show when we have
- * no picture of it to turn yet. Capture measures ~270ms on a 1080p display, so
- * this has to clear that comfortably; turning early means turning a blank
- * panel, which is exactly the fake-looking flip this gate exists to prevent.
- * Typing is unaffected: the editor took focus on the first frame.
+ * no picture of it to turn yet. Turning early means turning a blank panel,
+ * which is the fake-looking flip this gate exists to prevent.
+ *
+ * The GDI blit lands in ~50ms, so this is mostly slack rather than a real
+ * wait. Typing is unaffected either way: the editor took focus on frame one.
  */
-const SHOT_WAIT_MS = 500
+const SHOT_WAIT_MS = 200
 
 type Phase = 'idle' | 'waiting' | 'opening' | 'closing'
 
@@ -182,8 +183,6 @@ export default function App(): React.JSX.Element {
 
   const meta = session?.snapshot
   const title = session?.note.title || meta?.title || ''
-  const depthClass =
-    phase === 'opening' ? 'depth is-opening' : phase === 'closing' ? 'depth is-closing' : 'depth'
 
   // Perspective has to scale with the card, or the same focal length that
   // looks right on a small window tears a maximized one apart. Tied to the
@@ -203,19 +202,32 @@ export default function App(): React.JSX.Element {
   // opaque before the card first exposes it and stay so until the card covers
   // it again on the way out.
   const turningNow = phase === 'opening' || phase === 'closing'
+  const frameClass = [
+    'frame',
+    turningNow ? 'is-flipping' : '',
+    phase === 'opening' ? 'is-opening' : '',
+    phase === 'closing' ? 'is-closing' : ''
+  ]
+    .filter(Boolean)
+    .join(' ')
 
   return (
     <div className="stage" onMouseDown={(e) => e.target === e.currentTarget && close()}>
-      <div className={`frame${turningNow ? ' is-flipping' : ''}`} style={frameStyle}>
+      <div className={frameClass} style={frameStyle}>
         <div className="recess">
           {shot ? <img src={shot.dataUrl} alt="" draggable={false} /> : null}
         </div>
-        <div className={depthClass}>
+        <div className="depth">
           <div className={`card${flipped ? ' flipped' : ''}`}>
             <div className="face face--front">
               {shot ? <img src={shot.dataUrl} alt="" draggable={false} /> : null}
               <div className="sheen" />
+              <div className="shade shade--front" />
             </div>
+
+            {/* The card has thickness; these close the slab at its sides. */}
+            <div className="edge edge--l" />
+            <div className="edge edge--r" />
 
             <div className="face face--back">
               <div className="meta">
@@ -229,6 +241,7 @@ export default function App(): React.JSX.Element {
                   <kbd>esc</kbd>
                 </span>
               </div>
+              <div className="shade shade--back" />
               <Editor
                 ref={editorRef}
                 onChange={scheduleSave}

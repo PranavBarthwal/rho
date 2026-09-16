@@ -17,6 +17,7 @@ import koffi from 'koffi'
 const user32 = koffi.load('user32.dll')
 const kernel32 = koffi.load('kernel32.dll')
 const dwmapi = koffi.load('dwmapi.dll')
+const gdi32 = koffi.load('gdi32.dll')
 
 export const HWND = koffi.pointer('HWND', koffi.opaque())
 export const RECT = koffi.struct('RECT', {
@@ -70,6 +71,29 @@ export const DwmGetWindowAttributeRect = dwmapi.func(
 export const DwmGetWindowAttributeDword = dwmapi.func(
   'int __stdcall DwmGetWindowAttribute(HWND hwnd, uint32 dwAttribute, _Out_ uint32 *pvAttribute, uint32 cbAttribute)'
 )
+
+/*
+ * GDI, for copying pixels off the screen. See win32/screengrab.ts for why this
+ * is done by hand rather than through Electron's desktopCapturer.
+ */
+export const GetDC = user32.func('void* __stdcall GetDC(void* hWnd)')
+export const ReleaseDC = user32.func('int __stdcall ReleaseDC(void* hWnd, void* hDC)')
+export const CreateCompatibleDC = gdi32.func('void* __stdcall CreateCompatibleDC(void* hdc)')
+export const CreateCompatibleBitmap = gdi32.func(
+  'void* __stdcall CreateCompatibleBitmap(void* hdc, int cx, int cy)'
+)
+export const SelectObject = gdi32.func('void* __stdcall SelectObject(void* hdc, void* h)')
+export const BitBlt = gdi32.func(
+  'bool __stdcall BitBlt(void* hdc, int x, int y, int cx, int cy, void* hdcSrc, int x1, int y1, uint32 rop)'
+)
+export const GetDIBits = gdi32.func(
+  'int __stdcall GetDIBits(void* hdc, void* hbm, uint32 start, uint32 lines, _Out_ void* bits, _Inout_ void* bmi, uint32 usage)'
+)
+export const DeleteObject = gdi32.func('bool __stdcall DeleteObject(void* ho)')
+export const DeleteDC = gdi32.func('bool __stdcall DeleteDC(void* hdc)')
+
+/** Plain copy. Deliberately not CAPTUREBLT, which can itself cause flicker. */
+export const SRCCOPY = 0x00cc0020
 
 export const GA_ROOT = 2
 export const SW_RESTORE = 9

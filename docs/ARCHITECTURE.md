@@ -61,6 +61,24 @@ window. Two things prevent it:
   but a moment where the window sits there looking untouched, which is the
   honest thing to show when there is no picture of it yet.
 
+**Light, not just rotation.** A surface angling away from the light loses it.
+Each face carries a shading layer that darkens as it turns edge-on and recovers
+as it comes back — opacity there is linear in the rotation, so those animations
+carry the same spring easing as the card itself and track the true angle rather
+than wall-clock time. This is the single biggest thing separating a turning
+object from a rotating picture.
+
+**A slab, not a plane.** The two faces sit half a thickness either side of
+centre, with edge strips closing the box. Only a few pixels, and only visible
+for the couple of frames either side of edge-on — but something that vanishes
+completely when it turns side-on reads as a texture, and something that shows
+an edge reads as a thing.
+
+Everything that is not linear in the rotation — the recede, the sheen — peaks at
+21%, which is where the spring actually puts the card edge-on rather than
+halfway through the duration. Solve the easing for 0.5: it crosses between its
+sixth and seventh stops, at t ≈ 0.2075.
+
 **Springs, not ease curves.** The rotation runs on a `linear()` easing solved
 from SwiftUI's `.spring(response: 0.42, dampingFraction: 0.78)`. It turns about
 2% past 180° and settles back. A cubic-bezier cannot overshoot, and that settle
@@ -194,6 +212,12 @@ Two scripts regenerate the media in `docs/`, both against the mock, so neither
 can pick up anything from the machine that ran them:
 
 - `scripts/shoot.cjs` — the still screenshots.
+Both open their window off the side of the desktop rather than using
+`show: false`. A hidden window composites lazily and `capturePage()` returns
+frames where some layers never repainted — the editor showing one note while
+the header still shows the last. The DOM is correct in that state; only the
+pixels are stale, which makes it an easy thing to misread as a state bug.
+
 - `scripts/record.cjs` — the demo GIF. It does not record in real time;
   `capturePage()` costs tens of milliseconds, so a live capture would drop
   frames unevenly. Instead the CSS animations are rebuilt as *paused* Web

@@ -91,6 +91,15 @@ Press the hotkey behind any window and start typing. Press it again — or hit
 | <kbd>Ctrl</kbd> <kbd>Enter</kbd> | Same, for different muscle memory |
 | <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>L</kbd> | Open the library |
 
+In the library:
+
+| Shortcut | Does |
+|---|---|
+| <kbd>↑</kbd> <kbd>↓</kbd> | Move through notes |
+| <kbd>Ctrl</kbd> <kbd>F</kbd> | Jump to search |
+| <kbd>Enter</kbd> | From search, start writing in the note |
+| <kbd>Esc</kbd> | Clear the search |
+
 > [!NOTE]
 > If another app already owns <kbd>Ctrl</kbd> <kbd>Alt</kbd> <kbd>Space</kbd>,
 > rho quietly takes the next free combination instead. The tray menu and
@@ -115,7 +124,8 @@ its place.
 | `**bold**` `*italic*` `` `code` `` | Inline formatting |
 
 Type `/` at the start of a line for a menu of the same things, for when you
-can't remember which prefix.
+can't remember which prefix. Select text and a small toolbar appears with the
+same formatting, for when your hands are already on the mouse.
 
 <img src="docs/overlay.png" alt="The note surface, with headings, a quote and a to-do list" width="820">
 
@@ -127,6 +137,10 @@ Open it from the tray, or with <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>L</kbd>.
 Notes are grouped by the app they were written behind, and search covers
 titles, addresses and note text at once. There are no folders and no tags —
 you find a note by remembering where you were.
+
+Each note can take you back to where it came from: **Open page** returns to the
+address it was written behind, and **Show file** reveals its markdown in
+Explorer. Deleting asks first.
 
 ## Your notes
 

@@ -92,18 +92,14 @@ async function openOverlay(): Promise<void> {
   })
 
   // Everything below is cosmetic or corrective and must not block typing.
-  void hydrate(snapshot, note.id, dipRect)
+  void hydrate(snapshot, note.id)
 }
 
 /**
  * Post-show work: the screenshot for the flip's front face, and the URL that
  * may re-key the note. Both are allowed to fail silently.
  */
-async function hydrate(
-  snapshot: WindowSnapshot,
-  noteId: string,
-  dipRect: Electron.Rectangle
-): Promise<void> {
+async function hydrate(snapshot: WindowSnapshot, noteId: string): Promise<void> {
   const win = getOverlay()
 
   // With shots turned off there is no picture of the window to turn, so the
@@ -111,7 +107,7 @@ async function hydrate(
   // about the window is ever written to disk.
   const shotStart = Date.now()
   const capturing = getSettings().captureShots
-    ? captureRect(snapshot.rect, dipRect).then(async (cap) => {
+    ? captureRect(snapshot.rect).then(async (cap) => {
         // The turn is gated on this arriving, so its cost is worth watching.
         log('capture', { ms: Date.now() - shotStart, ok: !!cap, ...(cap?.timing ?? {}) })
         if (!cap) {

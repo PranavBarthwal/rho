@@ -38,6 +38,28 @@ interface MenuState {
 
 const CLOSED: MenuState = { open: false, query: '', index: 0, left: 0, top: 0, from: 0 }
 
+/** Where the selection toolbar sits, and whether there is a selection at all. */
+interface BubbleState {
+  open: boolean
+  left: number
+  top: number
+}
+
+const NO_BUBBLE: BubbleState = { open: false, left: 0, top: 0 }
+
+/** The marks and blocks the toolbar can reach. */
+const BUBBLE_ITEMS = [
+  { id: 'bold', label: 'B', title: 'Bold', className: 'is-bold' },
+  { id: 'italic', label: 'I', title: 'Italic', className: 'is-italic' },
+  { id: 'strike', label: 'S', title: 'Strikethrough', className: 'is-strike' },
+  { id: 'code', label: '<>', title: 'Code', className: 'is-code' },
+  { id: 'h2', label: 'H', title: 'Heading', className: 'is-h' },
+  { id: 'blockquote', label: '"', title: 'Quote', className: 'is-quote' },
+  { id: 'bulletList', label: '•', title: 'Bulleted list', className: 'is-list' }
+] as const
+
+type BubbleId = (typeof BUBBLE_ITEMS)[number]['id']
+
 /**
  * The note surface.
  *
@@ -51,6 +73,9 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
   ref
 ) {
   const [menu, setMenu] = useState<MenuState>(CLOSED)
+  const [bubble, setBubble] = useState<BubbleState>(NO_BUBBLE)
+  /** Re-read on every selection change so the toolbar shows what is active. */
+  const [active, setActive] = useState<Record<string, boolean>>({})
   const menuRef = useRef<MenuState>(CLOSED)
   menuRef.current = menu
   const hostRef = useRef<HTMLDivElement>(null)
@@ -92,7 +117,14 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
       onChange?.(ed.storage.markdown.getMarkdown())
       syncMenu(ed)
     },
-    onSelectionUpdate: ({ editor: ed }) => syncMenu(ed)
+    onSelectionUpdate: ({ editor: ed }) => syncMenu(ed),
+    // A selection can outlive focus — clicking another note in the library
+    // leaves one behind — and a toolbar hovering over a note you are no longer
+    // editing is just debris.
+    onBlur: () => {
+      setBubble(NO_BUBBLE)
+      setMenu(CLOSED)
+    }
   })
 
   /**
@@ -102,7 +134,34 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
    */
   const syncMenu = useCallback((ed: TipTapEditor) => {
     const { state } = ed
-    const { from, empty } = state.selection
+    const { from, to, empty } = state.selection
+
+    // The toolbar belongs to a selection; the slash menu belongs to a caret.
+    // They are mutually exclusive, which is why both live in one pass.
+    if (!empty) {
+      const host = hostRef.current?.getBoundingClientRect()
+      const a = ed.view.coordsAtPos(from)
+      const b = ed.view.coordsAtPos(to)
+      setActive({
+        bold: ed.isActive('bold'),
+        italic: ed.isActive('italic'),
+        strike: ed.isActive('strike'),
+        code: ed.isActive('code'),
+        h2: ed.isActive('heading', { level: 2 }),
+        blockquote: ed.isActive('blockquote'),
+        bulletList: ed.isActive('bulletList')
+      })
+      setBubble({
+        open: true,
+        // Centred over the selection, clamped so a selection at the very edge
+        // does not push the toolbar out of the note.
+        left: Math.max(96, (a.left + b.left) / 2 - (host?.left ?? 0)),
+        top: Math.min(a.top, b.top) - (host?.top ?? 0)
+      })
+    } else {
+      setBubble(NO_BUBBLE)
+    }
+
     if (!empty) {
       setMenu(CLOSED)
       return
@@ -141,6 +200,21 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
       editor.chain().focus().deleteRange({ from: menuRef.current.from, to: from }).run()
       cmd.run(editor)
       setMenu(CLOSED)
+    },
+    [editor]
+  )
+
+  const applyBubble = useCallback(
+    (id: BubbleId) => {
+      if (!editor) return
+      const c = editor.chain().focus()
+      if (id === 'bold') c.toggleBold().run()
+      else if (id === 'italic') c.toggleItalic().run()
+      else if (id === 'strike') c.toggleStrike().run()
+      else if (id === 'code') c.toggleCode().run()
+      else if (id === 'h2') c.toggleHeading({ level: 2 }).run()
+      else if (id === 'blockquote') c.toggleBlockquote().run()
+      else if (id === 'bulletList') c.toggleBulletList().run()
     },
     [editor]
   )
@@ -224,6 +298,28 @@ const Editor = forwardRef<EditorHandle, Props>(function Editor(
   return (
     <div className={`editor-host${className ? ` ${className}` : ''}`} ref={hostRef}>
       <EditorContent editor={editor} className="editor-scroll" />
+
+      {bubble.open ? (
+        <div className="bubble" style={{ left: bubble.left, top: bubble.top - 10 }} role="toolbar">
+          {BUBBLE_ITEMS.map((it) => (
+            <button
+              key={it.id}
+              type="button"
+              title={it.title}
+              aria-pressed={!!active[it.id]}
+              className={`bubble__btn ${it.className}${active[it.id] ? ' is-on' : ''}`}
+              // mousedown, not click: click blurs the editor first and the
+              // command would apply to a selection that no longer exists.
+              onMouseDown={(e) => {
+                e.preventDefault()
+                applyBubble(it.id)
+              }}
+            >
+              {it.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       {menu.open && items.length > 0 ? (
         <div className="slash" style={{ left: menu.left, top: menu.top + 8 }} role="listbox">
